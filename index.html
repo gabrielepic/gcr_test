@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>gCR Report Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+/* ── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy:    #0D2B5E;
+  --navy2:   #1A3F7A;
+  --red:     #C8102E;
+  --green:   #1A7A4A;
+  --orange:  #D97706;
+  --blue:    #1D63C8;
+  --violet:  #6D28D9;
+  --teal:    #0E7490;
+  --gray1:   #F8F9FB;
+  --gray2:   #EEF0F4;
+  --gray3:   #D1D5DB;
+  --gray4:   #9CA3AF;
+  --gray5:   #6B7280;
+  --gray6:   #374151;
+  --text:    #111827;
+  --white:   #FFFFFF;
+  --radius:  8px;
+  --shadow:  0 2px 12px rgba(13,43,94,.08);
+  --shadow-lg: 0 4px 24px rgba(13,43,94,.12);
+  --font: 'Segoe UI', Arial, Helvetica, sans-serif;
+  --mono: 'Courier New', Courier, monospace;
+}
+html { font-size: 14px; }
+body { font-family: var(--font); background: var(--gray1); color: var(--text); line-height: 1.5; }
+table { border-collapse: collapse; width: 100%; }
+button, select, input { font-family: var(--font); cursor: pointer; }
+
+/* ── CONFIG SCREEN ────────────────────────────────────────── */
+#config-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #0a2146 0%, #163a72 60%, #1a4d8f 100%);
+}
+.config-card {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 40px;
+  max-width: 540px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0,0,0,.25);
+}
+.config-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.config-logo {
+  width: 48px; height: 48px;
+  background: var(--navy);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.config-brand-label { font-size: 11px; color: var(--gray5); font-weight: 600; letter-spacing: .8px; text-transform: uppercase; }
+.config-brand-title { font-size: 18px; font-weight: 700; color: var(--navy); }
+.config-divider {
+  height: 3px;
+  background: linear-gradient(90deg, var(--navy), var(--red));
+  border-radius: 2px;
+  margin: 18px 0 24px;
+}
+.form-row { display: flex; gap: 14px; margin-bottom: 16px; }
+.form-group { flex: 1; }
+.form-label { font-size: 11px; font-weight: 700; color: var(--navy); margin-bottom: 5px; letter-spacing: .4px; text-transform: uppercase; }
+.form-select {
+  width: 100%; padding: 10px 12px;
+  border-radius: var(--radius); border: 1.5px solid var(--gray3);
+  font-size: 14px; color: var(--text);
+  background: var(--white);
+  transition: border-color .15s;
+}
+.form-select:focus { outline: none; border-color: var(--navy); }
+.dropzone {
+  border: 2px dashed var(--gray3);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  background: var(--gray1);
+  transition: all .2s;
+  cursor: pointer;
+}
+.dropzone:hover { border-color: var(--navy); background: #EEF3FB; }
+.dropzone.loaded { border-color: var(--green); background: #F0FDF4; border-style: solid; }
+.dropzone-icon { font-size: 22px; margin-bottom: 4px; }
+.dropzone-label { font-size: 12px; font-weight: 600; color: var(--navy); }
+.dropzone.loaded .dropzone-label { color: var(--green); }
+.drop-files { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.error-box { display: none; background: #FEE2E2; color: var(--red); padding: 10px 14px; border-radius: var(--radius); font-size: 13px; margin-bottom: 14px; }
+.rtype-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 9px 10px; border-radius: var(--radius);
+  border: 1.5px solid var(--gray3); cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--gray5);
+  transition: all .15s; user-select: none;
+}
+.rtype-btn:has(input:checked) {
+  border-color: var(--navy); background: #EEF3FB; color: var(--navy);
+}
+.rtype-btn input { display: none; }
+.btn-generate {
+  width: 100%; padding: 14px;
+  background: var(--gray3); color: var(--white);
+  border: none; border-radius: var(--radius);
+  font-size: 15px; font-weight: 700;
+  transition: all .2s; letter-spacing: .2px;
+}
+.btn-generate.ready {
+  background: linear-gradient(135deg, var(--navy), var(--navy2));
+  box-shadow: 0 4px 16px rgba(13,43,94,.3);
+}
+.btn-generate.ready:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(13,43,94,.4); }
+
+/* ── REPORT LAYOUT ────────────────────────────────────────── */
+#report-screen { display: none; }
+
+/* Top toolbar */
+#toolbar {
+  background: var(--navy);
+  color: var(--white);
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 200;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+#toolbar-title { font-size: 14px; font-weight: 700; }
+.toolbar-actions { display: flex; gap: 8px; }
+.toolbar-btn {
+  padding: 6px 14px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.25);
+  color: var(--white);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background .15s;
+}
+.toolbar-btn:hover { background: rgba(255,255,255,.22); }
+.toolbar-btn.primary {
+  background: var(--red);
+  border-color: var(--red);
+}
+.toolbar-btn.primary:hover { background: #a50f24; }
+
+/* Filter bar */
+#filter-bar {
+  background: var(--navy2);
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 52px;
+  z-index: 199;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.filter-label { font-size: 12px; color: rgba(255,255,255,.7); font-weight: 600; }
+.filter-select {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  font-size: 12px;
+  background: rgba(255,255,255,.12);
+  color: var(--white);
+  font-weight: 500;
+}
+.filter-select option { background: var(--navy); color: var(--white); }
+#filter-status { font-size: 11px; color: rgba(255,255,255,.5); margin-left: auto; }
+
+/* Main content: sidebar + body */
+#report-layout {
+  display: flex;
+  align-items: flex-start;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  gap: 20px;
+}
+
+/* Sidebar TOC */
+#toc-sidebar {
+  width: 192px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 110px;
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 0;
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+}
+.toc-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gray4);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--gray2);
+  margin-bottom: 8px;
+}
+.toc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--gray5);
+  cursor: pointer;
+  transition: all .15s;
+  border-left: 3px solid transparent;
+  text-decoration: none;
+}
+.toc-item:hover { color: var(--navy); background: var(--gray1); border-left-color: var(--gray3); }
+.toc-item.active { color: var(--navy); font-weight: 600; border-left-color: var(--navy); background: #EEF3FB; }
+.toc-item .toc-icon { font-size: 13px; width: 16px; flex-shrink: 0; }
+.toc-separator { height: 1px; background: var(--gray2); margin: 6px 14px; }
+.toc-item.toc-line { padding-left: 24px; font-size: 11px; }
+
+/* Content area */
+#report-content { flex: 1; min-width: 0; }
+
+/* ── CARDS ────────────────────────────────────────────────── */
+.card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.card-header {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  gap: 12px;
+  border-bottom: 1px solid var(--gray2);
+  transition: background .15s;
+}
+.card-header:hover { background: var(--gray1); }
+.card-header.no-toggle { cursor: default; }
+.card-header.no-toggle:hover { background: var(--white); }
+.card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--gray2);
+  color: var(--gray5);
+}
+.card-body { padding: 16px 20px; }
+.card-toggle { font-size: 13px; color: var(--gray4); transition: transform .2s; }
+.card-toggle.collapsed { transform: rotate(180deg); }
+
+/* ── KPI GRID ─────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.kpi-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  border-top: 3px solid var(--navy);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kpi-icon { font-size: 18px; }
+.kpi-value { font-size: 32px; font-weight: 700; line-height: 1; }
+.kpi-label { font-size: 11px; color: var(--gray5); font-weight: 500; margin-top: 2px; }
+
+/* ── TABLES ───────────────────────────────────────────────── */
+.table-wrap {
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid var(--gray2);
+}
+.data-table { font-size: 12px; }
+.data-table thead tr { background: var(--navy); }
+.data-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--white);
+  white-space: nowrap;
+  letter-spacing: .3px;
+}
+.data-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--gray2);
+  vertical-align: top;
+}
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:nth-child(even) td { background: var(--gray1); }
+.data-table tbody tr:hover td { background: #EEF3FB; }
+.data-table tbody tr.overdue-row td { background: #FFF5F5; }
+.data-table tbody tr.overdue-row:hover td { background: #FFE8E8; }
+.cr-id { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--navy); white-space: nowrap; }
+.cr-link { text-decoration: underline; text-decoration-color: rgba(13,43,94,.35); text-underline-offset: 2px; cursor: pointer; }
+.cr-link:hover { color: var(--blue); text-decoration-color: var(--blue); }
+@media print { .cr-link { text-decoration: underline; text-decoration-color: rgba(13,43,94,.5); color: var(--navy) !important; } }
+.desc-cell { min-width: 180px; max-width: 260px; color: var(--gray6); }
+.attn-table { table-layout: fixed; width: 100%; }
+.attn-table .col-id   { width: 110px; }
+.attn-table .col-desc { width: auto; }        /* takes all remaining space */
+.attn-table .col-rev  { width: 52px; text-align: center; }
+.attn-table .col-phase{ width: 110px; }
+.attn-table .col-status{ width: 100px; }
+.attn-table .col-urg  { width: 72px; }
+.attn-table .col-days { width: 106px; text-align: center; }
+.attn-table td, .attn-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attn-table thead th { white-space: nowrap; }
+.attn-table .col-desc td, .attn-desc { white-space: normal; word-break: break-word; }
+.notes-cell { min-width: 160px; max-width: 220px; color: var(--gray6); font-style: italic; font-size: 11px; }
+
+/* ── BADGES & DOTS ────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.status-cell { display: flex; align-items: center; white-space: nowrap; }
+
+/* ── PHASE/TYPOLOGY PANELS ────────────────────────────────── */
+.stats-row { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; margin-bottom: 16px; }
+.phase-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.phase-chip {
+  text-align: center;
+  padding: 12px 6px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+}
+.phase-chip-val { font-size: 24px; font-weight: 700; line-height: 1.1; }
+.phase-chip-label { font-size: 10px; font-weight: 600; margin-top: 3px; }
+.typo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.typo-chip { text-align: center; padding: 12px 6px; border-radius: 8px; }
+.typo-chip-val { font-size: 24px; font-weight: 700; color: var(--navy); line-height: 1.1; }
+.typo-chip-label { font-size: 10px; font-weight: 700; color: var(--gray5); margin-top: 3px; }
+
+/* ── CR DISTRIBUTION SECTION ─────────────────────────────── */
+.distrib-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.distrib-box {
+  background: var(--gray1);
+  border-radius: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--gray2);
+}
+.distrib-box-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 10px;
+}
+.distrib-chips {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.distrib-chips-machines {
+  grid-template-columns: repeat(4, 1fr);
+}
+.chip-exec-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #D97706;
+  margin-top: 3px;
+  letter-spacing: .2px;
+}
+
+/* ── COMPLIANCE SECTION ───────────────────────────────────── */
+.compliance-boxes {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.comp-box {
+  border-radius: 8px;
+  padding: 12px 8px;
+  background: var(--gray1);
+  text-align: center;
+  border-bottom: 3px solid var(--gray3);
+}
+.comp-box-line { font-size: 13px; font-weight: 700; color: var(--navy); }
+.comp-box-site { font-size: 10px; color: var(--gray5); margin-bottom: 6px; }
+.comp-box-pct { font-size: 26px; font-weight: 700; line-height: 1.1; }
+.comp-box-detail { font-size: 10px; color: var(--gray5); margin-top: 4px; }
+.comp-box-overdue { font-size: 10px; font-weight: 700; color: var(--red); margin-top: 3px; }
+
+.bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.bar-row-label { width: 48px; font-size: 11px; font-weight: 700; color: var(--navy); flex-shrink: 0; }
+.bar-track { flex: 1; display: flex; height: 16px; border-radius: 4px; overflow: hidden; background: var(--gray2); }
+.bar-segment { display: flex; align-items: center; justify-content: center; overflow: hidden; transition: width .3s; }
+.bar-segment span { font-size: 9px; font-weight: 700; color: white; padding: 0 3px; white-space: nowrap; }
+.bar-total { font-size: 10px; color: var(--gray5); width: 30px; text-align: right; flex-shrink: 0; }
+.bar-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--gray5); }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+
+/* ── PER-LINE SECTIONS ────────────────────────────────────── */
+.line-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.line-header {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  flex-wrap: wrap;
+  transition: background .15s;
+}
+.line-header:hover { background: var(--gray1); }
+.line-name { font-weight: 800; font-size: 16px; color: var(--navy); }
+.line-site { font-size: 12px; color: var(--gray4); }
+.line-comp-badge {
+  font-size: 12px; font-weight: 700;
+  padding: 3px 12px; border-radius: 10px;
+}
+.line-count { font-size: 11px; color: var(--gray4); margin-left: auto; }
+.line-toggle { font-size: 13px; color: var(--gray4); margin-left: 8px; transition: transform .2s; }
+.line-toggle.collapsed { transform: rotate(180deg); }
+.line-body { padding: 0 20px 16px; }
+.sub-section { margin-bottom: 14px; }
+.sub-section:last-child { margin-bottom: 0; }
+.sub-label {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px;
+  margin-bottom: 8px;
+}
+.empty-note { font-size: 12px; color: var(--gray4); font-style: italic; padding: 8px 0; }
+
+/* ── IMPLEMENTATION CALENDAR ─────────────────────────────── */
+.cal-table { font-size: 12px; table-layout: fixed; width: 100%; }
+.cal-table th { background: var(--navy); color: white; font-size: 11px; font-weight: 700;
+  padding: 7px 6px; text-align: center; white-space: nowrap; }
+.cal-table th.cal-line-hdr { text-align: left; width: 80px; }
+.cal-table td { padding: 6px; text-align: center; border-bottom: 1px solid var(--gray2);
+  font-size: 12px; font-weight: 600; }
+.cal-table td.cal-line-cell { text-align: left; font-weight: 700; color: var(--navy);
+  font-size: 11px; white-space: nowrap; }
+.cal-table tr:nth-child(even) td { background: var(--gray1); }
+.cal-table tr:hover td { background: #EEF3FB; }
+.cal-cell-0  { color: var(--gray4); font-weight: 400 !important; }
+.cal-cell-lo { color: var(--orange); }
+.cal-cell-mid{ color: var(--blue); }
+.cal-cell-hi { color: var(--red); font-weight: 800 !important; }
+.cal-month-cur { background: #FFF8E7 !important; }
+@media print {
+  .cal-table th  { font-size: 7pt !important; padding: 4pt 3pt !important; }
+  .cal-table td  { font-size: 7pt !important; padding: 3pt !important; }
+  .cal-table th.cal-line-hdr { width: 50pt !important; }
+}
+
+/* ── HISTORICAL DATA NOTE ────────────────────────────────── */
+.historical-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #FFF8E7;
+  border: 1px solid #F59E0B;
+  border-left: 4px solid #F59E0B;
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #92400E;
+  line-height: 1.5;
+}
+.historical-note-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+@media print {
+  .historical-note { border-left-width: 3px; padding: 5pt 8pt; margin-bottom: 8pt; font-size: 7.5pt; }
+}
+
+/* ── FOOTER ───────────────────────────────────────────────── */
+.report-footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--gray4);
+  padding-bottom: 24px;
+  padding-top: 8px;
+}
+
+/* ── SCROLL ANIMATION ─────────────────────────────────────── */
+.fade-in { animation: fadeIn .3s ease-out both; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ═══════════════════════════════════════════════════════════
+   PRINT / PDF STYLES
+   ═══════════════════════════════════════════════════════════ */
+@media print {
+  /* ── Page setup ── */
+  @page {
+    size: A4 landscape;
+    margin: 14mm 12mm 18mm 12mm;
+  }
+
+  /* Running header/footer */
+  @page {
+    @top-left {
+      content: "Eli Lilly — PFS Platform — gCR Report";
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+      color: #6B7280;
+    }
+    @top-right {
+      content: string(report-month);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+      color: #0D2B5E;
+      font-weight: 600;
+    }
+    @bottom-left {
+      content: "CONFIDENTIAL — INTERNAL USE ONLY";
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 7pt;
+      color: #9CA3AF;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 7pt;
+      color: #6B7280;
+    }
+  }
+
+  /* ── Hide browser chrome ── */
+  #toolbar, #filter-bar, #toc-sidebar,
+  .card-toggle, .line-toggle,
+  #config-screen, .report-footer { display: none !important; }
+
+  /* ── Layout reset ── */
+  html { font-size: 9pt; }
+  body { background: white !important; }
+  #report-screen { display: block !important; }
+  #report-layout {
+    display: block !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  #report-content { width: 100% !important; }
+
+  /* ── Force collapsed sections open ── */
+  [data-collapsible] { display: block !important; }
+  .line-body { display: block !important; }
+
+  /* ── Color fidelity ── */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* ── Remove shadows, tighten spacing ── */
+  .card, .line-card, .kpi-card {
+    box-shadow: none !important;
+    border: 1px solid #D1D5DB !important;
+  }
+  .card        { margin-bottom: 8pt !important; }
+  .line-card   { margin-bottom: 6pt !important; }
+  .card-header { padding: 7pt 10pt !important; border-bottom: 1px solid #D1D5DB; }
+  .card-body   { padding: 8pt 10pt !important; }
+  .line-body   { padding: 0 10pt 8pt !important; }
+  .sub-section { margin-bottom: 6pt !important; }
+  .sub-label   { margin-bottom: 4pt !important; }
+
+  /* ── Typography ── */
+  .kpi-value       { font-size: 16pt !important; }
+  .kpi-label       { font-size: 7.5pt !important; }
+  .kpi-icon        { font-size: 12pt !important; }
+  .card-title      { font-size: 8.5pt !important; }
+  .sub-label       { font-size: 7.5pt !important; }
+  .line-name       { font-size: 11pt !important; }
+  .line-site       { font-size: 8pt !important; }
+  .line-comp-badge { font-size: 8pt !important; padding: 2pt 6pt !important; }
+  .comp-box-pct    { font-size: 14pt !important; }
+  .comp-box-line   { font-size: 9pt !important; }
+  .comp-box-site   { font-size: 7pt !important; }
+  .comp-box-detail { font-size: 7pt !important; }
+  .comp-box-overdue{ font-size: 7pt !important; }
+  .bar-row-label   { font-size: 8pt !important; }
+  .bar-total       { font-size: 8pt !important; }
+  .legend-item     { font-size: 7.5pt !important; }
+  .phase-chip-val  { font-size: 16pt !important; }
+  .phase-chip-label{ font-size: 7.5pt !important; }
+  .typo-chip-val   { font-size: 16pt !important; }
+  .typo-chip-label { font-size: 7.5pt !important; }
+  .cr-id           { font-size: 7.5pt !important; }
+  .desc-cell       { font-size: 7.5pt !important; min-width: 0 !important; max-width: none !important; }
+  .notes-cell      { font-size: 7.5pt !important; min-width: 0 !important; max-width: none !important; }
+  .empty-note      { font-size: 8pt !important; }
+  .badge           { font-size: 7pt !important; padding: 1pt 5pt !important; }
+
+  /* ── Tables ── */
+  .table-wrap { border: none !important; overflow: visible !important; }
+  .data-table   { font-size: 7.5pt !important; }
+  .data-table th { font-size: 7.5pt !important; padding: 4pt 6pt !important; }
+  .data-table td { font-size: 7.5pt !important; padding: 3pt 6pt !important; }
+  .data-table thead { display: table-header-group; }
+  /* Allow rows to break — avoid only creates whitespace with long tables */
+  .data-table tbody tr { page-break-inside: avoid; }
+
+  /* ── Grids ── */
+  .kpi-grid {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 5pt !important;
+    margin-bottom: 8pt !important;
+  }
+  .kpi-card { padding: 7pt 8pt !important; }
+  .stats-row {
+    display: grid !important;
+    grid-template-columns: 3fr 2fr !important;
+    gap: 8pt !important;
+    margin-bottom: 8pt !important;
+  }
+  .phase-grid  { display: grid !important; grid-template-columns: repeat(5,1fr) !important; gap: 5pt !important; }
+  .typo-grid   { display: grid !important; grid-template-columns: repeat(3,1fr) !important; gap: 5pt !important; }
+  .distrib-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6pt !important;
+  }
+  .distrib-box { padding: 6pt 8pt !important; }
+  .distrib-box-title { font-size: 7.5pt !important; margin-bottom: 5pt !important; }
+  .distrib-chips { gap: 4pt !important; }
+  .chip-exec-label { font-size: 6.5pt !important; }
+  .distrib-chips-machines { grid-template-columns: repeat(4,1fr) !important; }
+
+  .compliance-boxes {
+    display: grid !important;
+    grid-template-columns: repeat(5,1fr) !important;
+    gap: 5pt !important;
+    margin-bottom: 8pt !important;
+  }
+  .comp-box { padding: 6pt 5pt !important; }
+  .phase-chip { padding: 6pt 4pt !important; }
+  .typo-chip  { padding: 6pt 4pt !important; }
+
+  /* ── Bar chart ── */
+  .bar-row  { margin-bottom: 3pt !important; }
+  .bar-track { height: 11pt !important; }
+  .bar-legend { margin-top: 5pt !important; gap: 8pt !important; }
+
+  /* ── PAGE BREAK STRATEGY ─────────────────────────────────── */
+
+  /* Small blocks: never split */
+  .kpi-grid    { page-break-inside: avoid; }
+  .phase-chip  { page-break-inside: avoid; }
+  .typo-chip   { page-break-inside: avoid; }
+  .comp-box    { page-break-inside: avoid; }
+  .bar-row     { page-break-inside: avoid; }
+  .bar-legend  { page-break-inside: avoid; }
+  .sub-label   { page-break-after: avoid; }
+  .empty-note  { page-break-inside: avoid; }
+
+  /* Cards: allow internal breaks, header stays with body */
+  .card        { page-break-inside: auto; }
+  .card-header { page-break-after: avoid; }
+
+  /* Line cards: allow internal breaks, header stays with body */
+  .line-card   { page-break-inside: auto; }
+  .line-header { page-break-after: avoid; }
+
+  /* Sub-sections */
+  .sub-section { page-break-inside: auto; }
+
+  /* ── FIXED PAGE BREAKS after specific sections ── */
+  #sec-phases     { page-break-after: always; }
+  #sec-activity   { page-break-after: always; }
+  #sec-attention  { page-break-after: always; }
+  #sec-compliance { page-break-after: always; }
+  #sec-calendar   { page-break-after: always; }
+
+  /* Page break after each line card */
+  .line-card { page-break-after: always; }
+  /* ...except the very last one before the footer */
+  .line-card:last-of-type { page-break-after: avoid; }
+
+  /* Report header: keep with KPI grid below */
+  .report-header-card { page-break-after: avoid; }
+
+  /* ── Status string for @top-right ── */
+  #running-month-string { string-set: report-month content(); }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════
+     CONFIG SCREEN
+     ════════════════════════════════════════════ -->
+<div id="config-screen">
+  <div class="config-card">
+    <div class="config-brand">
+      <div class="config-logo">📋</div>
+      <div>
+        <div class="config-brand-label">Eli Lilly · PFS Platform</div>
+        <div class="config-brand-title">gCR Report Generator</div>
+      </div>
+    </div>
+    <div class="config-divider"></div>
+
+    <!-- Report Type -->
+    <div class="form-group" style="margin-bottom:14px">
+      <div class="form-label">Report Type</div>
+      <div style="display:flex;gap:8px">
+        <label class="rtype-btn" id="rtype-monthly">
+          <input type="radio" name="rtype" value="monthly" checked onchange="onRtypeChange()">
+          <span>Monthly</span>
+        </label>
+        <label class="rtype-btn" id="rtype-quarterly">
+          <input type="radio" name="rtype" value="quarterly" onchange="onRtypeChange()">
+          <span>Quarterly</span>
+        </label>
+        <label class="rtype-btn" id="rtype-annual">
+          <input type="radio" name="rtype" value="annual" onchange="onRtypeChange()">
+          <span>Annual</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Period selectors (shown/hidden based on type) -->
+    <div class="form-row">
+      <div class="form-group" id="grp-month">
+        <div class="form-label">Month</div>
+        <select id="sel-month" class="form-select">
+          <option value="0">January</option><option value="1">February</option><option value="2">March</option>
+          <option value="3">April</option><option value="4">May</option><option value="5">June</option>
+          <option value="6">July</option><option value="7">August</option><option value="8">September</option>
+          <option value="9">October</option><option value="10">November</option><option value="11">December</option>
+        </select>
+      </div>
+      <div class="form-group" id="grp-quarter" style="display:none">
+        <div class="form-label">Quarter</div>
+        <select id="sel-quarter" class="form-select">
+          <option value="0">Q1 (Jan–Mar)</option>
+          <option value="1">Q2 (Apr–Jun)</option>
+          <option value="2">Q3 (Jul–Sep)</option>
+          <option value="3">Q4 (Oct–Dec)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Year</div>
+        <select id="sel-year" class="form-select">
+          <option value="2024">2024</option><option value="2025">2025</option>
+          <option value="2026" selected>2026</option><option value="2027">2027</option>
+        </select>
+      </div>
+    </div>
+    <div class="drop-files">
+      <div id="drop-cr" class="dropzone" onclick="document.getElementById('inp-cr').click()">
+        <div class="dropzone-icon">📂</div>
+        <div class="dropzone-label">gCR List PROD.csv</div>
+        <div style="font-size:11px;color:var(--gray4);margin-top:2px">Click to select file</div>
+      </div>
+      <input id="inp-cr" type="file" accept=".csv" style="display:none" onchange="loadFile(this,'cr')">
+      <div id="drop-line" class="dropzone" onclick="document.getElementById('inp-line').click()">
+        <div class="dropzone-icon">📂</div>
+        <div class="dropzone-label">gCR Lines Status PROD.csv</div>
+        <div style="font-size:11px;color:var(--gray4);margin-top:2px">Click to select file</div>
+      </div>
+      <input id="inp-line" type="file" accept=".csv" style="display:none" onchange="loadFile(this,'line')">
+    </div>
+    <div id="error-box" class="error-box"></div>
+    <button id="btn-generate" class="btn-generate" onclick="generate()" disabled>Generate Report</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     REPORT SCREEN
+     ════════════════════════════════════════════ -->
+<div id="report-screen">
+
+  <!-- Sticky Top Bar -->
+  <div id="toolbar">
+    <b id="toolbar-title">gCR PFS Platform</b>
+    <div class="toolbar-actions">
+      <button class="toolbar-btn" onclick="toggleAll()" id="btn-toggle-all">Collapse All</button>
+      <button class="toolbar-btn primary" onclick="window.print()">🖨 Print / Save PDF</button>
+      <button class="toolbar-btn" onclick="showConfig()">← New</button>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div id="filter-bar">
+    <span class="filter-label">Filter:</span>
+    <select id="filter-site" class="filter-select" onchange="onSiteChange()">
+      <option value="All">All sites</option>
+      <option value="Sesto">Sesto (IT)</option>
+      <option value="IPM">IPM (US)</option>
+      <option value="RTP">RTP (US)</option>
+      <option value="CON">CON (US)</option>
+      <option value="LKC">LKC (US)</option>
+    </select>
+    <select id="filter-line" class="filter-select" onchange="applyFilter()">
+      <option value="All">All lines</option>
+      <option value="PFS2">PFS2 (Sesto)</option><option value="PFS3">PFS3 (IPM)</option>
+      <option value="PFS4">PFS4 (RTP)</option><option value="PFS5">PFS5 (RTP)</option>
+      <option value="PFS6">PFS6 (CON)</option><option value="PFS7">PFS7 (CON)</option>
+      <option value="PFS8">PFS8 (CON)</option><option value="PFS9">PFS9 (RTP)</option>
+      <option value="PFS10">PFS10 (IPM)</option><option value="PFS11">PFS11 (LKC)</option>
+    </select>
+    <span id="filter-status">Showing all lines</span>
+  </div>
+
+  <!-- Layout: TOC + Content -->
+  <div id="report-layout">
+    <!-- TOC Sidebar -->
+    <nav id="toc-sidebar">
+      <div class="toc-title">Contents</div>
+      <a class="toc-item" href="javascript:void(0)" onclick="tocScrollTo('sec-overview')">
+        <span class="toc-icon">🏠</span> Overview
+      </a>
+      <a class="toc-item" href="javascript:void(0)" onclick="tocScrollTo('sec-phases')">
+        <span class="toc-icon">📊</span> CR Distribution
+      </a>
+      <a class="toc-item" href="javascript:void(0)" onclick="tocScrollTo('sec-activity')">
+        <span class="toc-icon">📅</span> Monthly Activity
+      </a>
+      <a class="toc-item" href="javascript:void(0)" onclick="tocScrollTo('sec-attention')">
+        <span class="toc-icon">⚠️</span> Attention Required
+      </a>
+      <a class="toc-item" href="javascript:void(0)" onclick="tocScrollTo('sec-compliance')">
+        <span class="toc-icon">📈</span> Compliance
+      </a>
+      <a class="toc-item" href="javascript:void(0)" onclick="tocScrollTo('sec-calendar')">
+        <span class="toc-icon">📆</span> Impl. Calendar
+      </a>
+      <div class="toc-separator"></div>
+      <div class="toc-title" style="padding-top:6px">Lines</div>
+      <div id="toc-lines"></div>
+    </nav>
+
+    <!-- Main Content -->
+    <div id="report-content"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   CONSTANTS & CONFIG
+   ═══════════════════════════════════════════════════════════ */
+var crText = null, lineText = null;
+var LINES = ["PFS2","PFS3","PFS4","PFS5","PFS6","PFS7","PFS8","PFS9","PFS10","PFS11"];
+var SITES = {PFS2:"Sesto (IT)",PFS3:"IPM (US)",PFS4:"RTP (US)",PFS5:"RTP (US)",PFS6:"CON (US)",PFS7:"CON (US)",PFS8:"CON (US)",PFS9:"RTP (US)",PFS10:"IPM (US)",PFS11:"LKC (US)"};
+var SITE_LINES = {"All":LINES,"Sesto":["PFS2"],"IPM":["PFS3","PFS10"],"RTP":["PFS4","PFS5","PFS9"],"CON":["PFS6","PFS7","PFS8"],"LKC":["PFS11"]};
+var MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+var PHASES = ["Acceptance","Approval","Execution","Closed","Rejected"];
+var TYPOLOGIES = ["GCR","EXT","OTH"];
+var TYPE_OF_CHANGE = ["Software","Mechanic","Documentation","ElectricalPneumatic"];
+var MACHINES = ["DBA-S","DBA-SBA","TRR","H6","ISO","TVB","SIRM","CONV"];
+var URGENCY_ORDER = {"High":0,"Medium":1,"Low":2,"":3};
+
+var C = {
+  navy:"#0D2B5E", red:"#C8102E", green:"#1A7A4A",
+  orange:"#D97706", blue:"#1D63C8", violet:"#6D28D9",
+  teal:"#0E7490", gray:"#6B7280", gray2:"#9CA3AF"
+};
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════ */
+window.onload = function() {
+  var now = new Date();
+  document.getElementById("sel-month").value = now.getMonth();
+  document.getElementById("sel-quarter").value = Math.floor(now.getMonth() / 3);
+  document.getElementById("sel-year").value = now.getFullYear();
+};
+
+function onRtypeChange() {
+  var rtype = document.querySelector('input[name="rtype"]:checked').value;
+  document.getElementById("grp-month").style.display   = rtype === "monthly"   ? "" : "none";
+  document.getElementById("grp-quarter").style.display = rtype === "quarterly" ? "" : "none";
+}
+
+function getPeriod() {
+  var rtype = document.querySelector('input[name="rtype"]:checked').value;
+  var year  = parseInt(document.getElementById("sel-year").value);
+  if (rtype === "monthly") {
+    var month = parseInt(document.getElementById("sel-month").value);
+    return { rtype:"monthly", year:year, startMonth:month, endMonth:month,
+             label: MONTH_NAMES[month]+" "+year };
+  }
+  if (rtype === "quarterly") {
+    var q = parseInt(document.getElementById("sel-quarter").value);
+    var sm = q * 3, em = sm + 2;
+    var qLabels = ["Q1","Q2","Q3","Q4"];
+    return { rtype:"quarterly", year:year, startMonth:sm, endMonth:em,
+             label: qLabels[q]+" "+year+" ("+MONTH_NAMES[sm]+"–"+MONTH_NAMES[em]+")" };
+  }
+  // annual
+  return { rtype:"annual", year:year, startMonth:0, endMonth:11,
+           label: "Annual "+year };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════ */
+function sk(s)  { return (s||"").toLowerCase().replace(/\s+/g," ").trim(); }
+
+function phaseColor(p) {
+  return ({Acceptance:C.teal,Approval:C.violet,Execution:C.orange,Closed:C.green,Rejected:C.red})[p]||C.gray;
+}
+function statusColor(s) {
+  return ({"done":C.green,"done with comments":C.blue,"planned":C.orange,"to be planned":C.gray2,"superseded":C.violet})[sk(s)]||C.gray;
+}
+
+function badge(label, color) {
+  return '<span class="badge" style="background:'+color+'1A;color:'+color+'">'+label+'</span>';
+}
+function crLink(title, url) {
+  if (!url || !url.trim()) return '<span class="cr-id">'+title+'</span>';
+  return '<a class="cr-id cr-link" href="'+url.trim()+'" target="_blank" rel="noopener">'+title+'</a>';
+}
+function dot(status) {
+  return '<span class="status-dot" style="background:'+statusColor(status)+'"></span>';
+}
+
+function parseDate(s) {
+  if (!s||s.trim()===""||s==="nan") return null;
+  var d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+function fmtDate(d) {
+  if (!d) return "—";
+  return d.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});
+}
+function fmtPlanned(s) {
+  if (!s) return "—";
+  var p = s.split("/");
+  if (p.length===2) return p[0].padStart(2,"0")+"/"+p[1];
+  if (p.length===3) return p[1].padStart(2,"0")+"/"+p[0].padStart(2,"0")+"/"+p[2];
+  return s;
+}
+function plannedSortKey(s) {
+  if (!s) return "9999/99";
+  var p = s.split("/");
+  if (p.length===2) return p[1]+"/"+p[0].padStart(2,"0");
+  if (p.length===3) return p[2]+"/"+p[0].padStart(2,"0")+"/"+p[1].padStart(2,"0");
+  return "9999/99";
+}
+function isOverdue(pd, month, year) {
+  if (!pd) return false;
+  var p = pd.split("/"), d;
+  if (p.length===2) d = new Date(parseInt(p[1]), parseInt(p[0])-1, 1);
+  else if (p.length===3) d = new Date(parseInt(p[2]), parseInt(p[0])-1, 1);
+  else return false;
+  return d < new Date(year, month, 1);
+}
+function daysInPhase(r) {
+  var today = new Date(), phase = r.Phase ? r.Phase.trim() : "", since = null;
+  if (phase==="Acceptance") since = parseDate(r.AcceptanceDate)||parseDate(r.Created);
+  if (phase==="Approval")   since = parseDate(r.AcceptanceDate);
+  if (!since) return "—";
+  var diff = Math.floor((today - since) / 86400000);
+  return diff >= 0 ? diff : "—";
+}
+function daysColor(d) {
+  if (d==="—") return C.gray;
+  if (d>60) return C.red;
+  if (d>30) return C.orange;
+  return C.green;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILE LOADING
+   ═══════════════════════════════════════════════════════════ */
+function loadFile(inp, type) {
+  var file = inp.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    if (type==="cr")   { crText=e.target.result;   markLoaded("drop-cr",file.name); }
+    else               { lineText=e.target.result; markLoaded("drop-line",file.name); }
+    checkReady();
+  };
+  reader.readAsText(file,"utf-8");
+}
+function markLoaded(id, name) {
+  var el = document.getElementById(id);
+  el.classList.add("loaded");
+  el.innerHTML = '<div class="dropzone-icon">📂</div><div class="dropzone-label">'+name+'</div>';
+}
+function checkReady() {
+  if (crText && lineText) {
+    var btn = document.getElementById("btn-generate");
+    btn.disabled = false;
+    btn.classList.add("ready");
+  }
+}
+function parseCsv(text) {
+  return Papa.parse(text,{header:true,skipEmptyLines:true,dynamicTyping:false}).data;
+}
+function showConfig() {
+  document.getElementById("config-screen").style.display = "flex";
+  document.getElementById("report-screen").style.display = "none";
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COLLAPSE / TOGGLE
+   ═══════════════════════════════════════════════════════════ */
+function toggleSection(bodyId, btnId) {
+  var body = document.getElementById(bodyId);
+  var btn  = document.getElementById(btnId);
+  if (!body) return;
+  var isOpen = body.style.display !== "none";
+  body.style.display = isOpen ? "none" : "";
+  if (btn) btn.classList.toggle("collapsed", isOpen);
+}
+function toggleAll() {
+  var btn = document.getElementById("btn-toggle-all");
+  var sections = document.querySelectorAll("[data-collapsible]");
+  var anyOpen = false;
+  sections.forEach(function(s) { if (s.style.display!=="none") anyOpen=true; });
+  sections.forEach(function(s) {
+    var id = s.getAttribute("id");
+    s.style.display = anyOpen ? "none" : "";
+    var arrow = document.getElementById(id+"-arrow");
+    if (arrow) arrow.classList.toggle("collapsed", anyOpen);
+  });
+  btn.textContent = anyOpen ? "Expand All" : "Collapse All";
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FILTER
+   ═══════════════════════════════════════════════════════════ */
+function onSiteChange() {
+  var site = document.getElementById("filter-site").value;
+  var lineSelect = document.getElementById("filter-line");
+  var activeLines = SITE_LINES[site] || LINES;
+  lineSelect.innerHTML = '<option value="All">All lines</option>';
+  activeLines.forEach(function(l) {
+    lineSelect.innerHTML += '<option value="'+l+'">'+l+' ('+SITES[l]+')</option>';
+  });
+  applyFilter();
+}
+function applyFilter() {
+  var site = document.getElementById("filter-site").value;
+  var line = document.getElementById("filter-line").value;
+  var activeLines = line!=="All" ? [line] : (SITE_LINES[site]||LINES);
+  var shown = 0;
+
+  LINES.forEach(function(l) {
+    var visible = activeLines.indexOf(l) !== -1;
+    if (visible) shown++;
+    var sec = document.getElementById("sec-line-"+l);
+    if (sec) sec.style.display = visible ? "" : "none";
+    var cb = document.getElementById("comp-box-"+l);
+    if (cb) cb.style.display = visible ? "" : "none";
+    var br = document.getElementById("comp-bar-row-"+l);
+    if (br) br.style.display = visible ? "" : "none";
+    var ti = document.getElementById("toc-line-"+l);
+    if (ti) ti.style.display = visible ? "" : "none";
+  });
+
+  document.getElementById("filter-status").textContent = "Showing "+shown+" of "+LINES.length+" lines";
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOC SCROLL
+   ═══════════════════════════════════════════════════════════ */
+function getStickyOffset() {
+  var toolbar   = document.getElementById("toolbar");
+  var filterBar = document.getElementById("filter-bar");
+  var h = 0;
+  if (toolbar   && toolbar.offsetParent   !== null) h += toolbar.offsetHeight;
+  if (filterBar && filterBar.offsetParent !== null) h += filterBar.offsetHeight;
+  return h + 16; // 16px extra breathing room
+}
+
+function tocScrollTo(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var offset = getStickyOffset();
+  var top = el.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({top:top, behavior:"smooth"});
+  // Update active
+  document.querySelectorAll(".toc-item").forEach(function(i){ i.classList.remove("active"); });
+  var link = document.querySelector("[data-toc='"+id+"']");
+  if (link) link.classList.add("active");
+}
+window.addEventListener("scroll", function() {
+  var sections = ["sec-overview","sec-phases","sec-activity","sec-attention","sec-compliance","sec-calendar"];
+  var offset = getStickyOffset() + 8;
+  var current = "";
+  sections.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top < offset) current = id;
+  });
+  document.querySelectorAll(".toc-item").forEach(function(i){ i.classList.remove("active"); });
+  if (current) {
+    var link = document.querySelector("[data-toc='"+current+"']");
+    if (link) link.classList.add("active");
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   DATA PROCESSING
+   ═══════════════════════════════════════════════════════════ */
+function deduplicateCRs(rows) {
+  var grouped = {};
+  rows.forEach(function(r) {
+    if (!r.Title||!r.Title.trim()) return;
+    var k = r.Title.trim();
+    if (!grouped[k]) grouped[k] = [];
+    grouped[k].push(r);
+  });
+  return Object.values(grouped).map(function(versions) {
+    versions.sort(function(a,b){ return (parseInt(b.Rev)||0)-(parseInt(a.Rev)||0); });
+    var m = Object.assign({},versions[0]);
+    m._allIds    = versions.map(function(v){ return String(v.ID); });
+    m._allRevs   = versions.map(function(v){ return parseInt(v.Rev)||0; });
+    m._allPhases = versions.map(function(v){ return v.Phase?v.Phase.trim():""; });
+    return m;
+  });
+}
+function buildValidIds(crRows) {
+  var s = new Set();
+  crRows.forEach(function(r) {
+    var p = (r.Phase||"").trim();
+    if (p==="Execution"||p==="Closed") s.add(String(r.ID));
+  });
+  return s;
+}
+function attachImpl(crs, lineRows, validIds) {
+  var vlr = lineRows.filter(function(r){ return validIds.has(String(r.CRID).trim()); });
+  crs.forEach(function(cr) {
+    var impl = {};
+    cr._allIds.forEach(function(id,idx) {
+      if (!validIds.has(id)) return;
+      vlr.filter(function(r){ return String(r.CRID).trim()===id; }).forEach(function(r) {
+        var line = r.Line ? r.Line.trim() : "";
+        if (!line) return;
+        impl[id+"__"+line] = {
+          status: r.Status?r.Status.trim():"",
+          plannedDate: r["Planned Date"]?r["Planned Date"].trim():null,
+          executionDate: parseDate(r["Execution Date"]),
+          note: r.Note?r.Note.trim():"",
+          fromId:id, fromRev:cr._allRevs[idx], fromPhase:cr._allPhases[idx], line:line
+        };
+      });
+    });
+    cr._impl = impl;
+  });
+}
+function calcLineStats(crs, line, month, year) {
+  var entries = [];
+  crs.forEach(function(cr){ Object.values(cr._impl).forEach(function(e){ if(e.line===line) entries.push(e); }); });
+  var done    = entries.filter(function(e){ return sk(e.status)==="done"; }).length;
+  var dwc     = entries.filter(function(e){ return sk(e.status)==="done with comments"; }).length;
+  var planned = entries.filter(function(e){ return sk(e.status)==="planned"; }).length;
+  var sup     = entries.filter(function(e){ return sk(e.status)==="superseded"; }).length;
+  var tbp     = entries.filter(function(e){ return sk(e.status).indexOf("to be planned")!==-1; }).length;
+  var total   = entries.length, totalNoSup = total-sup;
+  var overdue = entries.filter(function(e){ return sk(e.status)==="planned"&&isOverdue(e.plannedDate,month,year); }).length;
+  return {total,done,dwc,planned,tbp,sup,totalNoSup,overdue,
+    compliance: totalNoSup>0 ? Math.round(((done+dwc)/totalNoSup)*100) : 0};
+}
+function filterEntries(crs, line, month, year) {
+  var entries = [];
+  crs.forEach(function(cr) {
+    Object.values(cr._impl).forEach(function(e) {
+      if (e.line!==line) return;
+      var s = sk(e.status), ph = e.fromPhase;
+      var ent = Object.assign({},e,{
+        crTitle: cr.Title?cr.Title.trim():"",
+        crRev: e.fromRev,
+        description: (cr.Description||cr["Problem Statement"]||"").substring(0,120),
+        urgency: cr.Urgency?cr.Urgency.trim():"",
+        veevaUrl: cr["Hyperlink Veeva"]?cr["Hyperlink Veeva"].trim():"",
+        overdue: s==="planned"&&isOverdue(e.plannedDate,month,year)
+      });
+      if (ph==="Execution") {
+        if (s.indexOf("to be planned")!==-1||s==="planned") { entries.push(ent); return; }
+        if (s==="done"||s==="done with comments") {
+          var ed = e.executionDate;
+          if (ed&&ed.getMonth()===month&&ed.getFullYear()===year) entries.push(ent);
+        }
+      }
+      if (ph==="Closed") {
+        if (s==="done"||s==="done with comments") {
+          var ed = e.executionDate;
+          if (ed&&ed.getMonth()===month&&ed.getFullYear()===year) entries.push(ent);
+        }
+      }
+    });
+  });
+  return entries.sort(function(a,b) {
+    var ga=(sk(a.status)==="done"||sk(a.status)==="done with comments")?0:sk(a.status)==="planned"?1:2;
+    var gb=(sk(b.status)==="done"||sk(b.status)==="done with comments")?0:sk(b.status)==="planned"?1:2;
+    if (ga!==gb) return ga-gb;
+    if (ga===1) { var da=plannedSortKey(a.plannedDate),db=plannedSortKey(b.plannedDate); if(da!==db) return da.localeCompare(db); }
+    var ua=URGENCY_ORDER[a.urgency||""]!==undefined?URGENCY_ORDER[a.urgency]:3;
+    var ub=URGENCY_ORDER[b.urgency||""]!==undefined?URGENCY_ORDER[b.urgency]:3;
+    if (ua!==ub) return ua-ub;
+    return a.crTitle.localeCompare(b.crTitle);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HTML BUILDERS
+   ═══════════════════════════════════════════════════════════ */
+function lineTableHTML(entries, isDone) {
+  if (!entries.length) return '<p class="empty-note">No entries to display.</p>';
+  var hCols = isDone
+    ? ["CR #","Description","Rev","Urg.","Status","Planned date","Exec. date","Notes"]
+    : ["CR #","Description","Rev","Urg.","Status","Planned date","Notes"];
+  var head = '<thead><tr>'+hCols.map(function(c){ return '<th>'+c+'</th>'; }).join('')+'</tr></thead>';
+  var rows = entries.map(function(e,i) {
+    var uc = e.urgency==="High"?C.red:e.urgency==="Medium"?C.orange:C.gray;
+    var overdueFlag = e.overdue ? '<span style="color:'+C.red+';font-weight:700;margin-right:4px">⚠</span>' : '';
+    var execCell = isDone ? '<td style="white-space:nowrap;font-size:11px">'+fmtDate(e.executionDate)+'</td>' : '';
+    return '<tr class="'+(e.overdue?"overdue-row":"")+'">' +
+      '<td>'+overdueFlag+crLink(e.crTitle, e.veevaUrl)+'</td>'+
+      '<td class="desc-cell">'+(e.description||"—")+'</td>'+
+      '<td style="text-align:center">'+e.crRev+'</td>'+
+      '<td><span style="font-size:11px;font-weight:600;color:'+uc+'">'+(e.urgency||"—")+'</span></td>'+
+      '<td><span class="status-cell">'+dot(e.status)+'<span style="font-size:11px;font-weight:600;color:'+statusColor(e.status)+'">'+e.status+'</span></span></td>'+
+      '<td style="font-size:11px;white-space:nowrap">'+fmtPlanned(e.plannedDate)+'</td>'+
+      execCell+
+      '<td class="notes-cell">'+(e.note||"—")+'</td>'+
+      '</tr>';
+  }).join('');
+  return '<div class="table-wrap"><table class="data-table">'+head+'<tbody>'+rows+'</tbody></table></div>';
+}
+
+function crMiniTable(rows, dateField, dateLabel) {
+  if (!rows.length) return '<p class="empty-note">No CRs in this period.</p>';
+  var head = '<thead><tr><th>CR #</th><th>Description</th><th>Rev</th><th>Status</th><th>Urgency</th><th>'+dateLabel+'</th></tr></thead>';
+  var trs = rows.map(function(r,i) {
+    var uc = r.Urgency==="High"?C.red:r.Urgency==="Medium"?C.orange:C.gray;
+    return '<tr>'+
+      '<td>'+crLink(r.Title||"", r["Hyperlink Veeva"]||"")+"</td>"+
+      '<td class="desc-cell">'+((r.Description||r["Problem Statement"]||"").substring(0,80)||"—")+'</td>'+
+      '<td style="text-align:center;font-size:11px">'+(r.Rev||"—")+'</td>'+
+      '<td style="font-size:11px">'+(r.Status||"—")+'</td>'+
+      '<td><span style="font-size:11px;font-weight:600;color:'+uc+'">'+(r.Urgency||"—")+'</span></td>'+
+      '<td style="font-size:11px;white-space:nowrap">'+fmtDate(parseDate(r[dateField]))+'</td>'+
+      '</tr>';
+  }).join('');
+  return '<div class="table-wrap"><table class="data-table">'+head+'<tbody>'+trs+'</tbody></table></div>';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PERIOD-AWARE DATA FUNCTIONS
+   ═══════════════════════════════════════════════════════════ */
+function inPeriodCheck(d, startMonth, endMonth, year) {
+  if (!d) return false;
+  if (d.getFullYear() !== year) return false;
+  return d.getMonth() >= startMonth && d.getMonth() <= endMonth;
+}
+function calcLineStatsPeriod(crs, line, startMonth, endMonth, year) {
+  var entries = [];
+  crs.forEach(function(cr){ Object.values(cr._impl).forEach(function(e){ if(e.line===line) entries.push(e); }); });
+  var done    = entries.filter(function(e){ return sk(e.status)==="done"; }).length;
+  var dwc     = entries.filter(function(e){ return sk(e.status)==="done with comments"; }).length;
+  var planned = entries.filter(function(e){ return sk(e.status)==="planned"; }).length;
+  var sup     = entries.filter(function(e){ return sk(e.status)==="superseded"; }).length;
+  var tbp     = entries.filter(function(e){ return sk(e.status).indexOf("to be planned")!==-1; }).length;
+  var total   = entries.length, totalNoSup = total-sup;
+  var overdue = entries.filter(function(e){ return sk(e.status)==="planned"&&isOverdue(e.plannedDate, startMonth, year); }).length;
+  return {total,done,dwc,planned,tbp,sup,totalNoSup,overdue,
+    compliance: totalNoSup>0 ? Math.round(((done+dwc)/totalNoSup)*100) : 0};
+}
+function filterEntriesPeriod(crs, line, startMonth, endMonth, year) {
+  var entries = [];
+  crs.forEach(function(cr) {
+    Object.values(cr._impl).forEach(function(e) {
+      if (e.line!==line) return;
+      var s = sk(e.status), ph = e.fromPhase;
+      var ent = Object.assign({},e,{
+        crTitle: cr.Title?cr.Title.trim():"",
+        crRev: e.fromRev,
+        description: (cr.Description||cr["Problem Statement"]||"").substring(0,120),
+        urgency: cr.Urgency?cr.Urgency.trim():"",
+        veevaUrl: cr["Hyperlink Veeva"]?cr["Hyperlink Veeva"].trim():"",
+        overdue: s==="planned"&&isOverdue(e.plannedDate, startMonth, year)
+      });
+      if (ph==="Execution") {
+        if (s.indexOf("to be planned")!==-1||s==="planned") { entries.push(ent); return; }
+        if (s==="done"||s==="done with comments") {
+          var ed = e.executionDate;
+          if (ed && inPeriodCheck(ed, startMonth, endMonth, year)) entries.push(ent);
+        }
+      }
+      if (ph==="Closed") {
+        if (s==="done"||s==="done with comments") {
+          var ed = e.executionDate;
+          if (ed && inPeriodCheck(ed, startMonth, endMonth, year)) entries.push(ent);
+        }
+      }
+    });
+  });
+  return entries.sort(function(a,b) {
+    var ga=(sk(a.status)==="done"||sk(a.status)==="done with comments")?0:sk(a.status)==="planned"?1:2;
+    var gb=(sk(b.status)==="done"||sk(b.status)==="done with comments")?0:sk(b.status)==="planned"?1:2;
+    if (ga!==gb) return ga-gb;
+    if (ga===1) { var da=plannedSortKey(a.plannedDate),db=plannedSortKey(b.plannedDate); if(da!==db) return da.localeCompare(db); }
+    var ua=URGENCY_ORDER[a.urgency||""]!==undefined?URGENCY_ORDER[a.urgency]:3;
+    var ub=URGENCY_ORDER[b.urgency||""]!==undefined?URGENCY_ORDER[b.urgency]:3;
+    if (ua!==ub) return ua-ub;
+    return a.crTitle.localeCompare(b.crTitle);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HISTORICAL PHASE LOGIC
+   ═══════════════════════════════════════════════════════════ */
+
+// Returns last day of the period (endMonth of year)
+function periodEndDate(endMonth, year) {
+  // Last day of the period at 23:59:59.999 local time
+  // (this avoids timezone issues where midnight UTC < midnight local)
+  var periodEnd = new Date(year, endMonth + 1, 0, 23, 59, 59, 999);
+  var today = new Date();
+  today.setHours(23, 59, 59, 999);
+  return periodEnd < today ? periodEnd : today;
+}
+
+// Reconstructs what phase a CR was in at a given reference date
+// Returns null if CR did not exist yet at refDate
+function getHistoricalPhase(r, refDate) {
+  var open   = parseDate(r.Created);
+  var accept = parseDate(r.AcceptanceDate);
+  var approv = parseDate(r.ApprovalDate);
+  var closed = parseDate(r.ClosedDate);
+  var reject = parseDate(r.RejectedDate);
+
+  // If OpeningDate missing, derive earliest known date from other transitions
+  if (!open) {
+    var dates = [accept, approv, closed, reject].filter(Boolean);
+    if (!dates.length) return null; // no dates at all — skip
+    open = dates.reduce(function(a,b){ return a < b ? a : b; });
+  }
+
+  // CR not yet opened at refDate
+  if (open > refDate) return null;
+
+  // Rejected: RejectedDate <= refDate (Rejected trumps everything)
+  if (reject && reject <= refDate) return "Rejected";
+
+  // Closed: ClosedDate <= refDate
+  if (closed && closed <= refDate) return "Closed";
+
+  // Execution: ApprovalDate <= refDate (and not yet closed/rejected)
+  if (approv && approv <= refDate) return "Execution";
+
+  // Approval: AcceptanceDate <= refDate (and not yet approved/closed/rejected)
+  if (accept && accept <= refDate) return "Approval";
+
+  // Acceptance: opened but no acceptance transition yet
+  return "Acceptance";
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GENERATE
+   ═══════════════════════════════════════════════════════════ */
+function generate() {
+  var errBox = document.getElementById("error-box");
+  errBox.style.display = "none";
+  try {
+    var period  = getPeriod();
+    var year    = period.year;
+    var startMonth = period.startMonth;
+    var endMonth   = period.endMonth;
+    // For monthly compat: "month" = startMonth
+    var month = startMonth;
+
+    var crRows   = parseCsv(crText);
+    var lineRows = parseCsv(lineText);
+    var crs      = deduplicateCRs(crRows);
+    var validIds = buildValidIds(crRows);
+    attachImpl(crs, lineRows, validIds);
+
+    // inPeriod: date falls within [startMonth..endMonth] of year
+    function inPeriod(d) {
+      if (!d) return false;
+      if (d > refDate) return false;
+      if (d.getFullYear() !== year) return false;
+      return d.getMonth() >= startMonth && d.getMonth() <= endMonth;
+    }
+
+    // Reference date: last day of the selected period
+    var refDate = periodEndDate(endMonth, year);
+
+    // Total CRs existing at end of period
+    var totalAtPeriod = crRows.filter(function(r){
+      return getHistoricalPhase(r, refDate) !== null;
+    }).length;
+
+    // Historical phase at end of period
+    var byPhase={}, byTypology={}, byTypeOfChange={}, byMachines={};
+    PHASES.forEach(function(p){ byPhase[p]=0; });
+    TYPOLOGIES.forEach(function(t){ byTypology[t]=0; });
+    TYPE_OF_CHANGE.forEach(function(t){ byTypeOfChange[t]=0; });
+    MACHINES.forEach(function(m){ byMachines[m]=0; });
+
+    var byTypeOfChangeExec={}, byMachinesExec={};
+    TYPE_OF_CHANGE.forEach(function(t){ byTypeOfChangeExec[t]=0; });
+    MACHINES.forEach(function(m){ byMachinesExec[m]=0; });
+
+    crRows.forEach(function(r) {
+      var hPhase = getHistoricalPhase(r, refDate);
+      if (!hPhase) return;
+
+      if (byPhase.hasOwnProperty(hPhase)) byPhase[hPhase]++;
+
+      var typ = (r.Typology||"").trim();
+      if (byTypology.hasOwnProperty(typ)) byTypology[typ]++;
+
+      TYPE_OF_CHANGE.forEach(function(t){
+        if ((r["TypeOfChange "+t]||"").trim().toUpperCase()==="TRUE") {
+          byTypeOfChange[t]++;
+          if (hPhase==="Execution") byTypeOfChangeExec[t]++;
+        }
+      });
+
+      MACHINES.forEach(function(m){
+        if ((r["Machines "+m]||"").trim().toUpperCase()==="TRUE") {
+          byMachines[m]++;
+          if (hPhase==="Execution") byMachinesExec[m]++;
+        }
+      });
+    });
+
+
+
+    var newCRs  = crRows.filter(function(r){ return inPeriod(parseDate(r.Created)); });
+    var appCRs  = crRows.filter(function(r){ return inPeriod(parseDate(r.ApprovalDate)); });
+    var clsCRs  = crRows.filter(function(r){ return inPeriod(parseDate(r.ClosedDate)); });
+    var rejCRs  = crRows.filter(function(r){ return inPeriod(parseDate(r.RejectedDate)); });
+    var attnCRs = crRows.filter(function(r){ var p=(r.Phase||"").trim(); return p==="Acceptance"||p==="Approval"; });
+
+    var lineStats={}, lineEntries={};
+    LINES.forEach(function(l) {
+      lineStats[l]  = calcLineStatsPeriod(crs, l, startMonth, endMonth, year);
+      lineEntries[l] = filterEntriesPeriod(crs, l, startMonth, endMonth, year);
+    });
+
+    renderReport({period, month, year, startMonth, endMonth,
+      total:totalAtPeriod, crRows, crs,
+      newM:newCRs.length, appM:appCRs.length, clsM:clsCRs.length, rejM:rejCRs.length,
+      byPhase, byTypology, byTypeOfChange, byMachines, byTypeOfChangeExec, byMachinesExec,
+      lineStats, lineEntries, newCRs, appCRs, clsCRs, rejCRs, attnCRs});
+  } catch(e) {
+    errBox.textContent = "Error: "+e.message;
+    errBox.style.display = "block";
+    console.error(e);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════ */
+function renderReport(d) {
+  var period=d.period, month=d.month, year=d.year, startMonth=d.startMonth, endMonth=d.endMonth;
+  var total=d.total, crRows=d.crRows, crs=d.crs;
+  var newM=d.newM, appM=d.appM, clsM=d.clsM, rejM=d.rejM;
+  var byPhase=d.byPhase, byTypology=d.byTypology, byTypeOfChange=d.byTypeOfChange, byMachines=d.byMachines;
+  var byTypeOfChangeExec=d.byTypeOfChangeExec, byMachinesExec=d.byMachinesExec;
+  var lineStats=d.lineStats, lineEntries=d.lineEntries;
+  var newCRs=d.newCRs, appCRs=d.appCRs, clsCRs=d.clsCRs, rejCRs=d.rejCRs, attnCRs=d.attnCRs;
+  var mn = MONTH_NAMES[month];
+  var periodLabel = period.label;
+  var periodKpiLabel = period.rtype==="monthly" ? "this month" : period.rtype==="quarterly" ? "this quarter" : "this year";
+  // Determine if the selected period is current (today falls within it)
+  var today = new Date();
+  var periodEnd = new Date(year, endMonth + 1, 0, 23, 59, 59, 999);
+  var periodStart = new Date(year, startMonth, 1);
+  var isCurrentPeriod = (today >= periodStart && today <= periodEnd);
+  function historicalNote(section) {
+    if (isCurrentPeriod) return "";
+    return '<div class="historical-note"><span class="historical-note-icon">⚠️</span>' +
+      '<span><strong>' + section + '</strong> reflects the <strong>current status as of ' +
+      today.toLocaleDateString("en-GB") + '</strong>, not the historical state at end of ' +
+      periodLabel + '. These values cannot be reconstructed from the available data.</span></div>';
+  }
+
+  document.getElementById("toolbar-title").textContent = "gCR PFS Platform — "+periodLabel;
+
+  /* ── Build TOC lines ── */
+  var tocLines = "";
+  LINES.forEach(function(l) {
+    tocLines += '<a id="toc-line-'+l+'" class="toc-item toc-line" data-toc="sec-line-'+l+'" onclick="tocScrollTo(\'sec-line-'+l+'\')" style="cursor:pointer">'+l+' <span style="color:var(--gray4)">'+SITES[l]+'</span></a>';
+  });
+  document.getElementById("toc-lines").innerHTML = tocLines;
+  document.querySelectorAll("#toc-sidebar .toc-item").forEach(function(el) {
+    var toc = el.getAttribute("data-toc");
+    if (toc) el.setAttribute("data-toc",toc);
+  });
+
+  var html = "";
+
+  /* ── REPORT HEADER ── */
+  html += '<div id="sec-overview" class="card report-header-card fade-in" style="border-top:4px solid '+C.navy+'">';
+  html += '<div class="card-header no-toggle">';
+  html += '<div>';
+  html += '<div style="font-size:11px;color:var(--gray5);font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:3px">Eli Lilly · PFS Platform · Change Control</div>';
+  var reportTypeLabel = period.rtype==="monthly" ? "Monthly" : period.rtype==="quarterly" ? "Quarterly" : "Annual";
+  html += '<h1 style="font-size:22px;font-weight:700;color:var(--navy);margin-bottom:2px">'+reportTypeLabel+' gCR Status Report</h1>';
+  html += '<div style="font-size:18px;font-weight:700;color:'+C.red+'">'+periodLabel+'</div>';
+  // Hidden element for CSS string-set (print running header)
+  html += '<span id="running-month-string" style="display:none">'+periodLabel+'</span>';
+  html += '</div>';
+  html += '<div style="text-align:right;font-size:11px;color:var(--gray5);line-height:2">';
+  html += '<div>Generated: '+new Date().toLocaleDateString("en-GB")+'</div>';
+  html += '<div>Lines: PFS2–PFS11 · Sesto · IPM · RTP · CON · LKC</div>';
+  html += '</div></div></div>';
+
+  /* ── KPI CARDS ── */
+  html += '<div class="kpi-grid fade-in">';
+  [{l:"Total CRs",v:total,c:C.navy,i:"📄"},
+   {l:"New "+periodKpiLabel,v:newM,c:C.teal,i:"🆕"},
+   {l:"Approved "+periodKpiLabel,v:appM,c:C.violet,i:"✅"},
+   {l:"Closed "+periodKpiLabel,v:clsM,c:C.green,i:"🔒"},
+   {l:"Rejected "+periodKpiLabel,v:rejM,c:C.red,i:"❌"}
+  ].forEach(function(k) {
+    html += '<div class="kpi-card" style="border-top-color:'+k.c+'">';
+    html += '<div class="kpi-icon">'+k.i+'</div>';
+    html += '<div class="kpi-value" style="color:'+k.c+'">'+k.v+'</div>';
+    html += '<div class="kpi-label">'+k.l+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  /* ── CRS DISTRIBUTION (4 boxes: Phase, Typology, TypeOfChange, Machines) ── */
+  html += '<div id="sec-phases" class="card fade-in">';
+  html += '<div class="card-header" onclick="toggleSection(\'body-distrib\',\'arrow-distrib\')">'; 
+  html += '<div class="card-title">📊 CR Distribution</div>';
+  html += '<span id="arrow-distrib" class="card-toggle">▲</span>';
+  html += '</div>';
+  html += '<div id="body-distrib" data-collapsible class="card-body" style="padding:12px 16px">';
+  html += '<div class="distrib-grid">';
+
+  // Box 1 — CRs by Phase
+  html += '<div class="distrib-box">';
+  html += '<div class="distrib-box-title">🔵 CRs by Phase</div>';
+  html += '<div class="distrib-chips">';
+  PHASES.forEach(function(p) {
+    var v = byPhase[p]||0, col = phaseColor(p);
+    html += '<div class="phase-chip" style="background:'+col+'0F;border-color:'+col+'30">';
+    html += '<div class="phase-chip-val" style="color:'+col+'">'+v+'</div>';
+    html += '<div class="phase-chip-label" style="color:'+col+'">'+p+'</div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  // Box 2 — CRs by Typology
+  html += '<div class="distrib-box">';
+  html += '<div class="distrib-box-title">🏷 CRs by Typology</div>';
+  html += '<div class="distrib-chips">';
+  TYPOLOGIES.forEach(function(t) {
+    html += '<div class="typo-chip" style="background:var(--gray2)">';
+    html += '<div class="typo-chip-val">'+(byTypology[t]||0)+'</div>';
+    html += '<div class="typo-chip-label">'+t+'</div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  // Box 3 — CRs by Type of Change
+  var tocColors = {Software:C.teal, Mechanic:C.blue, Documentation:C.violet, ElectricalPneumatic:C.orange};
+  html += '<div class="distrib-box">';
+  html += '<div class="distrib-box-title">⚙️ CRs by Type of Change</div>';
+  html += '<div class="distrib-chips">';
+  TYPE_OF_CHANGE.forEach(function(t) {
+    var exec = byTypeOfChangeExec[t]||0;
+    html += '<div class="typo-chip" style="background:#EEF3FB">';
+    html += '<div class="typo-chip-val" style="color:'+C.navy+'">'+(byTypeOfChange[t]||0)+'</div>';
+    html += '<div class="typo-chip-label">'+t+'</div>';
+    html += '<div class="chip-exec-label">Exec: '+exec+'</div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  // Box 4 — CRs by Machines
+  html += '<div class="distrib-box">';
+  html += '<div class="distrib-box-title">🔩 CRs by Machine</div>';
+  html += '<div class="distrib-chips distrib-chips-machines">';
+  MACHINES.forEach(function(m) {
+    var exec = byMachinesExec[m]||0;
+    html += '<div class="typo-chip" style="background:#EEF3FB">';
+    html += '<div class="typo-chip-val" style="color:'+C.navy+'">'+(byMachines[m]||0)+'</div>';
+    html += '<div class="typo-chip-label">'+m+'</div>';
+    html += '<div class="chip-exec-label">Exec: '+exec+'</div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  html += '</div>'; // close distrib-grid
+  html += '</div></div>'; // close card-body + card
+
+  /* ── ATTENTION CRs ── */
+
+  /* ── MONTHLY ACTIVITY ── */
+  html += '<div id="sec-activity" class="card fade-in">';
+  html += '<div class="card-header" onclick="toggleSection(\'body-activity\',\'arrow-activity\')">';
+  html += '<div class="card-title">📅 Period Activity — '+periodLabel+'</div>';
+  html += '<span id="arrow-activity" class="card-toggle">▲</span>';
+  html += '</div>';
+  html += '<div id="body-activity" data-collapsible class="card-body">';
+  [{label:"🆕 New CRs",rows:newCRs,dateField:"Created",dateLabel:"Created",color:C.teal},
+   {label:"✅ Approved CRs",rows:appCRs,dateField:"ApprovalDate",dateLabel:"Approval",color:C.violet},
+   {label:"🔒 Closed CRs",rows:clsCRs,dateField:"ClosedDate",dateLabel:"Closing",color:C.green},
+   {label:"❌ Rejected CRs",rows:rejCRs,dateField:"RejectedDate",dateLabel:"Rejection",color:C.red}
+  ].forEach(function(sec,idx,arr) {
+    html += '<div class="sub-section">';
+    html += '<div class="sub-label" style="color:'+sec.color+'">'+sec.label+' <span class="card-badge">'+sec.rows.length+'</span></div>';
+    html += crMiniTable(sec.rows,sec.dateField,sec.dateLabel);
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+
+  html += '<div id="sec-attention" class="card fade-in">';
+  html += '<div class="card-header" onclick="toggleSection(\'body-attention\',\'arrow-attention\')">';
+  html += '<div class="card-title">⚠️ CRs Requiring Attention <span class="card-badge" style="'+(attnCRs.length>0?'background:#FEE2E2;color:'+C.red:'')+'">'+(attnCRs.length)+'</span></div>';
+  html += '<span id="arrow-attention" class="card-toggle">▲</span>';
+  html += '</div>';
+  html += '<div id="body-attention" data-collapsible class="card-body">';
+  html += historicalNote("CRs Requiring Attention");
+  if (!attnCRs.length) {
+    html += '<p class="empty-note">No CRs in Acceptance or Approval phase.</p>';
+  } else {
+    var sorted = attnCRs.slice().sort(function(a,b) {
+      var po={Acceptance:0,Approval:1};
+      var pa=po[a.Phase?a.Phase.trim():""]!==undefined?po[a.Phase.trim()]:2;
+      var pb=po[b.Phase?b.Phase.trim():""]!==undefined?po[b.Phase.trim()]:2;
+      if (pa!==pb) return pa-pb;
+      var uo={High:0,Medium:1,Low:2};
+      var ua=uo[a.Urgency?a.Urgency.trim():""]!==undefined?uo[a.Urgency.trim()]:3;
+      var ub=uo[b.Urgency?b.Urgency.trim():""]!==undefined?uo[b.Urgency.trim()]:3;
+      return ua-ub;
+    });
+    var attnColgroup = '<colgroup>'+
+      '<col class="col-id"><col class="col-desc"><col class="col-rev">'+
+      '<col class="col-phase"><col class="col-status"><col class="col-urg"><col class="col-days">'+
+      '</colgroup>';
+    var attnHead = '<thead><tr><th>CR #</th><th>Description</th><th style="text-align:center">Rev</th><th>Phase</th><th>Status</th><th>Urgency</th><th style="text-align:center">Days in phase</th></tr></thead>';
+    var attnRows = sorted.map(function(r,i) {
+      var phCol = phaseColor(r.Phase?r.Phase.trim():"");
+      var uc    = r.Urgency==="High"?C.red:r.Urgency==="Medium"?C.orange:C.gray;
+      var days  = daysInPhase(r), dc = daysColor(days);
+      return '<tr>'+
+        '<td>'+crLink(r.Title||"", r["Hyperlink Veeva"]||"")+"</td>"+
+        '<td class="attn-desc" style="color:var(--gray6);font-size:12px">'+((r.Description||r["Problem Statement"]||"").substring(0,160)||"—")+'</td>'+
+        '<td style="text-align:center;font-size:11px">'+(r.Rev||"—")+'</td>'+
+        '<td>'+badge(r.Phase?r.Phase.trim():"—",phCol)+'</td>'+
+        '<td style="font-size:11px;color:var(--gray6)">'+(r.Status||"—")+'</td>'+
+        '<td><span style="font-size:11px;font-weight:600;color:'+uc+'">'+(r.Urgency||"—")+'</span></td>'+
+        '<td style="text-align:center;font-size:12px;font-weight:700;color:'+dc+'">'+days+'</td>'+
+        '</tr>';
+    }).join('');
+    html += '<div class="table-wrap"><table class="data-table attn-table">'+attnColgroup+attnHead+'<tbody>'+attnRows+'</tbody></table></div>';
+  }
+  html += '</div></div>';
+
+  /* ── COMPLIANCE ── */
+  html += '<div id="sec-compliance" class="card fade-in">';
+  html += '<div class="card-header" onclick="toggleSection(\'body-compliance\',\'arrow-compliance\')"><div class="card-title">📈 Implementation Compliance by Line</div><span id="arrow-compliance" class="card-toggle">▲</span></div>';
+  html += historicalNote("Implementation Compliance by Line");
+  html += '<div id="body-compliance" data-collapsible class="card-body">';
+  // Boxes
+  html += '<div class="compliance-boxes">';
+  LINES.forEach(function(l) {
+    var s=lineStats[l], comp=s.compliance, col=comp>=80?C.green:comp>=50?C.orange:C.red;
+    html += '<div id="comp-box-'+l+'" class="comp-box" style="border-bottom-color:'+col+'">';
+    html += '<div class="comp-box-line">'+l+'</div>';
+    html += '<div class="comp-box-site">'+SITES[l]+'</div>';
+    html += '<div class="comp-box-pct" style="color:'+col+'">'+comp+'%</div>';
+    html += '<div class="comp-box-detail">✓ Done: '+(s.done+s.dwc)+' / '+s.totalNoSup+'</div>';
+    html += '<div class="comp-box-detail">📅 Planned: '+s.planned+'</div>';
+    if (s.overdue>0) html += '<div class="comp-box-overdue">⚠ Overdue: '+s.overdue+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  // Bar chart
+  var maxTotal = Math.max.apply(null, LINES.map(function(l){ return lineStats[l].totalNoSup||0; }))||1;
+  LINES.forEach(function(l) {
+    var s = lineStats[l];
+    var bars = [{k:"Done",v:s.done,c:C.green},{k:"Done w/comments",v:s.dwc,c:C.blue},
+                {k:"Planned",v:s.planned,c:C.orange},{k:"To Be Planned",v:s.tbp,c:"#9CA3AF"}];
+    html += '<div id="comp-bar-row-'+l+'" class="bar-row">';
+    html += '<div class="bar-row-label">'+l+'</div>';
+    html += '<div class="bar-track">';
+    bars.forEach(function(b) {
+      if (b.v>0) {
+        html += '<div class="bar-segment" title="'+b.k+': '+b.v+'" style="width:'+((b.v/maxTotal)*100)+'%;background:'+b.c+'">';
+        html += '<span>'+b.v+'</span></div>';
+      }
+    });
+    html += '</div><div class="bar-total">'+s.totalNoSup+'</div>';
+    html += '</div>';
+  });
+  html += '<div class="bar-legend">';
+  [{l:"Done",c:C.green},{l:"Done w/comments",c:C.blue},{l:"Planned",c:C.orange},{l:"To Be Planned",c:"#9CA3AF"}].forEach(function(x) {
+    html += '<span class="legend-item"><span class="legend-dot" style="background:'+x.c+'"></span>'+x.l+'</span>';
+  });
+  html += '</div></div></div>';
+
+  /* ── IMPLEMENTATION CALENDAR ── */
+  (function() {
+    // Build 13 months: from report month to +12
+    var months = [];
+    for (var mi = 0; mi <= 12; mi++) {
+      var d = new Date(year, startMonth + mi, 1);
+      months.push({ m: d.getMonth(), y: d.getFullYear() });
+    }
+
+    // For each line x month, count planned entries whose plannedDate falls in that month
+    // plannedDate format: "MM/YYYY" or "MM/DD/YYYY"
+    function parsePlannedMonth(pd) {
+      if (!pd) return null;
+      var p = pd.split("/");
+      if (p.length === 2) return { m: parseInt(p[0]) - 1, y: parseInt(p[1]) };
+      if (p.length === 3) return { m: parseInt(p[0]) - 1, y: parseInt(p[2]) };
+      return null;
+    }
+
+    // Build matrix: lineData[line][mi] = count of planned
+    // overdueData[line] = count of planned with plannedDate < report month
+    var lineData = {}, overdueData = {};
+    LINES.forEach(function(l) {
+      lineData[l] = [];
+      var ovCount = 0;
+      months.forEach(function(slot) {
+        var count = 0;
+        crs.forEach(function(cr) {
+          Object.values(cr._impl).forEach(function(e) {
+            if (e.line !== l) return;
+            if (sk(e.status) !== "planned") return;
+            var pm = parsePlannedMonth(e.plannedDate);
+            if (pm && pm.m === slot.m && pm.y === slot.y) count++;
+          });
+        });
+        lineData[l].push(count);
+      });
+      // overdue: planned with plannedDate strictly before report month
+      crs.forEach(function(cr) {
+        Object.values(cr._impl).forEach(function(e) {
+          if (e.line !== l) return;
+          if (sk(e.status) !== "planned") return;
+          if (isOverdue(e.plannedDate, month, year)) ovCount++;
+        });
+      });
+      overdueData[l] = ovCount;
+    });
+
+    // Cell renderer: uniform bold colored number, 0 shown as "0" in gray
+    function calCell(v, extraCls) {
+      var col = v === 0 ? "var(--gray4)" : "var(--orange)";
+      var fw  = v === 0 ? "400" : "700";
+      return '<td class="' + (extraCls||"") + '" style="color:' + col + ';font-weight:' + fw + '">' + v + '</td>';
+    }
+
+    // Render
+    html += '<div id="sec-calendar" class="card fade-in">';
+    html += '<div class="card-header" onclick="toggleSection(\'body-calendar\',\'arrow-calendar\')">';
+    html += '<div class="card-title">📆 Implementation Calendar</div>';
+    html += '<span id="arrow-calendar" class="card-toggle">▲</span>';
+    html += '</div>';
+    html += historicalNote("Implementation Calendar");
+    html += '<div id="body-calendar" data-collapsible class="card-body">';
+
+    // Header row — Overdue col before first month col
+    var hdr = '<thead><tr><th class="cal-line-hdr">Line</th>';
+    hdr += '<th style="background:' + C.red + ';min-width:56px">Overdue</th>';
+    months.forEach(function(slot) {
+      var mm = String(slot.m + 1).padStart(2,"0");
+      var isCur = (slot.m === startMonth && slot.y === year);
+      hdr += '<th'+(isCur?' style="background:#1A3F7A"':'')+'>'+mm+'/'+slot.y+'</th>';
+    });
+    hdr += '</tr></thead>';
+
+    // Body rows
+    var body = '<tbody>';
+    LINES.forEach(function(l) {
+      body += '<tr>';
+      body += '<td class="cal-line-cell">' + l + '</td>';
+      // Overdue cell
+      var ov = overdueData[l];
+      var ovCol = ov === 0 ? "var(--gray4)" : "var(--red)";
+      var ovFw  = ov === 0 ? "400" : "700";
+      body += '<td style="color:'+ovCol+';font-weight:'+ovFw+';background:#FFF5F5">'+ov+'</td>';
+      // Monthly cells
+      months.forEach(function(slot, mi) {
+        var v = lineData[l][mi];
+        var isCur = (slot.m === startMonth && slot.y === year);
+        body += calCell(v, isCur ? "cal-month-cur" : "");
+      });
+      body += '</tr>';
+    });
+    body += '</tbody>';
+
+    html += '<div class="table-wrap"><table class="cal-table">'+hdr+body+'</table></div>';
+    html += '</div></div>';
+  })();
+
+  /* ── PER-LINE SECTIONS ── */
+  html += '<div style="margin-bottom:16px">';
+  html += '<div class="card-title" style="padding:0 4px 12px;font-size:13px">CRs by Line — '+periodLabel+'</div>';
+  LINES.forEach(function(line,li) {
+    var entries = lineEntries[line], s = lineStats[line];
+    var compCol = s.compliance>=80?C.green:s.compliance>=50?C.orange:C.red;
+    var doneE  = entries.filter(function(e){ return sk(e.status)==="done"||sk(e.status)==="done with comments"; });
+    var otherE = entries.filter(function(e){ return sk(e.status)!=="done"&&sk(e.status)!=="done with comments"; });
+    var secId = "sec-line-"+line;
+    html += '<div id="'+secId+'" class="line-card fade-in" style="animation-delay:'+(li*0.04)+'s">';
+    html += '<div class="line-header" onclick="toggleSection(\'body-line-'+line+'\',\'arrow-line-'+line+'\')">';
+    html += '<span class="line-name">'+line+'</span>';
+    html += '<span class="line-site">'+SITES[line]+'</span>';
+    html += '<span class="line-comp-badge" style="background:'+compCol+'15;color:'+compCol+'">Compliance: '+s.compliance+'%</span>';
+    if (s.overdue>0) html += '<span class="badge" style="background:#FEE2E2;color:'+C.red+'">⚠ '+s.overdue+' overdue</span>';
+    html += '<span class="line-count">'+entries.length+' entries</span>';
+    html += '<span id="arrow-line-'+line+'" class="line-toggle">▲</span>';
+    html += '</div>';
+    html += '<div id="body-line-'+line+'" data-collapsible class="line-body">';
+    if (!entries.length) {
+      html += '<p class="empty-note">No entries to display for this month.</p>';
+    } else {
+      if (doneE.length) {
+        html += '<div class="sub-section">';
+        html += '<div class="sub-label" style="color:'+C.green+'">✅ Completed this '+(period.rtype==="monthly"?"month":period.rtype==="quarterly"?"quarter":"year")+' ('+doneE.length+')</div>';
+        html += lineTableHTML(doneE,true);
+        html += '</div>';
+      }
+      if (otherE.length) {
+        html += '<div class="sub-section">';
+        html += '<div class="sub-label" style="color:'+C.navy+'">🔄 In progress ('+otherE.length+')</div>';
+        html += historicalNote('In progress');
+        html += lineTableHTML(otherE,false);
+        html += '</div>';
+      }
+    }
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  /* ── FOOTER ── */
+  html += '<div class="report-footer">Report generated from SharePoint data · gCR Report Generator · Eli Lilly PFS Platform · '+periodLabel+'</div>';
+
+  /* ── Inject ── */
+  document.getElementById("report-content").innerHTML = html;
+  document.getElementById("config-screen").style.display = "none";
+  document.getElementById("report-screen").style.display = "block";
+
+  // Reset filters
+  document.getElementById("filter-site").value = "All";
+  document.getElementById("filter-line").value = "All";
+  document.getElementById("filter-status").textContent = "Showing all lines";
+  LINES.forEach(function(l) {
+    var el = document.getElementById("sec-line-"+l);
+    if (el) el.style.display = "";
+  });
+
+  // Update TOC links with onclick
+  document.querySelectorAll("#toc-sidebar .toc-item").forEach(function(el) {
+    var toc = el.getAttribute("data-toc");
+    if (toc) el.setAttribute("onclick","tocScrollTo('"+toc+"')");
+  });
+
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>
